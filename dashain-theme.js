@@ -13,7 +13,7 @@
   var ENABLED    = true;
   var START_DATE = new Date('2026-10-09T00:00:00+05:45'); // starts 9 Oct 2026 (Nepal time)
   var END_DATE   = new Date('2026-10-28T00:00:00+05:45'); // off at midnight, so 27 Oct 2026 is the last full day
-  var MUSIC_URL  = '';       // optional: 'audio/dashain.mp3'. Leave '' to use the built-in generated music
+  var MUSIC_URL  = ['audio/dashain.mp3'];  // <<< CHANGE MUSIC HERE. One or more mp3 paths, e.g. ['audio/song1.mp3','audio/song2.mp3']. Use [] for the built-in tune
   var TINT_SITE  = true;     // true = recolor buttons/headings to Dashain red & gold
   var DEFAULT_VOLUME = 0.5;
 
@@ -208,7 +208,7 @@
   var MADAL = ['L', '.', 'H', 'L', 'L', '.', 'H', 'h'];
 
   var ctx, master, verb, noiseBuf, timer, nextIdx, nextTime, engineOn = false, drones = [];
-  var audioEl, usingFile = !!MUSIC_URL;
+  var audioEl, tracks = [].concat(MUSIC_URL || []).filter(Boolean), usingFile = tracks.length > 0;
 
   function nowPos() { return ((Date.now() - (+sget('t0') || Date.now())) / 1000); }
 
@@ -312,9 +312,23 @@
 
   /* ---- mp3 mode ---- */
   function startFile() {
-    if (!audioEl) { audioEl = new Audio(MUSIC_URL); audioEl.loop = true; audioEl.preload = 'auto'; audioEl.volume = vol(); }
+    if (!audioEl) {
+      audioEl = new Audio();
+      audioEl.preload = 'auto';
+      audioEl.volume = vol();
+      audioEl.loop = tracks.length === 1;
+      audioEl.src = tracks[(+sget('track') || 0) % tracks.length];
+      if (tracks.length > 1) {
+        audioEl.addEventListener('ended', function () {
+          var k = ((+sget('track') || 0) + 1) % tracks.length;
+          sset('track', String(k));
+          audioEl.src = tracks[k];
+          audioEl.play().catch(function () {});
+        });
+      }
+    }
     var go = function () {
-      if (audioEl.duration) { try { audioEl.currentTime = nowPos() % audioEl.duration; } catch (e) {} }
+      if (tracks.length === 1 && audioEl.duration) { try { audioEl.currentTime = nowPos() % audioEl.duration; } catch (e) {} }
       audioEl.play().then(function () { hideHint(); setUI(true); }).catch(function () { showHint(); });
     };
     if (audioEl.readyState >= 1) go(); else audioEl.addEventListener('loadedmetadata', go, { once: true });
