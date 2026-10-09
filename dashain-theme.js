@@ -3,19 +3,22 @@
    ---------------------------------------------------------------------
    ADD:    <script src="dashain-theme.js" defer></script>   (inside <head>)
    REMOVE: delete that one line from each page (or set ENABLED = false).
-   The theme also switches itself off automatically after END_DATE.
+   Active from START_DATE until END_DATE, then switches itself off.
+   The theme shows instantly; music starts as soon as the browser allows.
    ===================================================================== */
 (function () {
   'use strict';
 
   /* ---------------- SETTINGS (edit these) ---------------- */
-  var ENABLED   = true;
-  var END_DATE  = new Date('2026-10-27T00:00:00+05:45'); // auto-off after Kojagrat Purnima
-  var MUSIC_URL = '';        // optional: 'audio/dashain.mp3'. Leave '' to use the built-in generated music
-  var TINT_SITE = true;      // true = recolor buttons/headings to Dashain red & gold
+  var ENABLED    = true;
+  var START_DATE = new Date('2026-10-09T00:00:00+05:45'); // starts 9 Oct 2026 (Nepal time)
+  var END_DATE   = new Date('2026-10-28T00:00:00+05:45'); // off at midnight, so 27 Oct 2026 is the last full day
+  var MUSIC_URL  = '';       // optional: 'audio/dashain.mp3'. Leave '' to use the built-in generated music
+  var TINT_SITE  = true;     // true = recolor buttons/headings to Dashain red & gold
   var DEFAULT_VOLUME = 0.5;
 
-  if (!ENABLED || Date.now() > END_DATE.getTime()) return;
+  var nowMs = Date.now();
+  if (!ENABLED || nowMs < START_DATE.getTime() || nowMs > END_DATE.getTime()) return;
   if (window.__dashainTheme) return;
   window.__dashainTheme = true;
 
@@ -72,18 +75,6 @@
   '.dz-hint{position:fixed;right:14px;bottom:66px;z-index:9001;background:#fff;color:#6e0f1c;padding:8px 12px;border-radius:12px;font:600 13px var(--font-body,Inter,Arial);box-shadow:0 8px 24px rgba(0,0,0,.2);display:none}' +
   '.dz-hint.show{display:block;animation:dz-pop .4s ease}' +
   '@keyframes dz-pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}' +
-  /* welcome overlay */
-  '.dz-welcome{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;text-align:center;padding:24px;color:#fff3d6;' +
-  'background:radial-gradient(circle at 50% 30%,#c8102e 0%,#8c0f20 45%,#4a0812 100%);animation:dz-in .5s ease}' +
-  '.dz-welcome.out{opacity:0;visibility:hidden;transition:opacity .6s,visibility .6s}' +
-  '@keyframes dz-in{from{opacity:0}to{opacity:1}}' +
-  '.dz-welcome h1{margin:6px 0 4px;font:700 clamp(30px,6vw,56px)/1.15 "Noto Serif Devanagari",serif;color:#ffc233}' +
-  '.dz-welcome p{margin:0 auto 22px;max-width:520px;font:500 clamp(14px,2.4vw,18px)/1.5 var(--font-body,Inter,Arial,sans-serif)}' +
-  '.dz-welcome .dz-big{width:min(440px,80vw);margin:0 auto}' +
-  '.dz-btn{all:unset;cursor:pointer;display:inline-block;margin:6px;padding:13px 26px;border-radius:999px;font:700 16px var(--font-body,Inter,Arial);box-sizing:border-box}' +
-  '.dz-btn.primary{background:#ffc233;color:#6e0f1c;box-shadow:0 8px 24px rgba(0,0,0,.35)}' +
-  '.dz-btn.ghost{border:2px solid rgba(255,243,214,.6);color:#fff3d6}' +
-  '.dz-btn:focus-visible{outline:3px solid #fff}' +
   '@media (max-width:700px){.dz-eyes{width:96px;bottom:68px}.dz-kalash{width:60px}.site-header::after{height:26px;background-size:90px 26px}}' +
   '@media (prefers-reduced-motion:reduce){.dz-kite,.dz-petal{animation:none!important}.dz-kite{transform:translate(70vw,20vh)}.dz-petal{display:none}}';
 
@@ -144,7 +135,7 @@
     '<path d="M96 124 Q100 112 120 112 Q138 112 136 124Z" fill="#b4592c"/><rect x="104" y="118" width="24" height="4" fill="#ffc233"/>' +
     '<g class="dz-flame"><path d="M120 110 q-8 -10 0 -24 q8 14 0 24z" fill="#ffb100"/><path d="M120 108 q-3 -6 0 -13 q3 7 0 13z" fill="#fff3d6"/></g></svg>';
 
-  /* ================= build layers ================= */
+  /* ================= build layers (shown immediately) ================= */
   var body = document.body;
   var layer = document.createElement('div');
   layer.className = 'dz-layer';
@@ -237,7 +228,7 @@
     var vg = ctx.createGain(); vg.gain.value = .35; verb.connect(vg); vg.connect(master);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     var nd = noiseBuf.getChannelData(0); for (q = 0; q < nd.length; q++) nd[q] = Math.random() * 2 - 1;
-    ctx.onstatechange = function () { if (ctx.state === 'running' && wantPlay()) startSynth(); };
+    ctx.onstatechange = function () { if (ctx.state === 'running' && wantPlay()) { startSynth(); hideHint(); } };
   }
 
   function env(g, t, a, peak, dur) {
@@ -333,7 +324,7 @@
   function vol() { var v = parseFloat(sget('vol')); return isNaN(v) ? DEFAULT_VOLUME : v; }
   function wantPlay() { return sget('music') === 'on'; }
 
-  function play(fromGesture) {
+  function play() {
     sset('music', 'on');
     if (!sget('t0')) sset('t0', String(Date.now()));
     if (usingFile) { startFile(); return; }
@@ -348,7 +339,7 @@
     if (usingFile) { if (audioEl) audioEl.pause(); } else stopSynth();
     setUI(false); hideHint();
   }
-  function resumeAfterPause() { sset('t0', String(Date.now() - (+sget('pos') || 0) * 1000)); play(true); }
+  function resumeAfterPause() { sset('t0', String(Date.now() - (+sget('pos') || 0) * 1000)); play(); }
 
   /* ---- UI: player pill + hint ---- */
   var pill = document.createElement('div');
@@ -359,7 +350,7 @@
   var btn = pill.querySelector('button'), slider = pill.querySelector('input');
   slider.value = vol();
   var hint = document.createElement('div');
-  hint.className = 'dz-hint'; hint.textContent = '🎶 Tap anywhere to continue the music';
+  hint.className = 'dz-hint'; hint.textContent = '🎶 Tap anywhere to start the music';
   body.appendChild(hint);
 
   function setUI(on) { pill.classList.toggle('dz-on', !!on); btn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
@@ -374,14 +365,18 @@
     if (master) master.gain.value = v; if (audioEl) audioEl.volume = v;
   });
 
-  // browsers block sound until a tap/click; resume on the first one
-  function unlock() {
+  // Browsers block sound until the visitor taps/clicks/presses a key.
+  // The first such action starts the music (scrolling/mouse-move do not count for browsers).
+  function unlock(e) {
+    if (e && e.target && pill.contains(e.target)) return; // the player button handles itself
     if (!wantPlay()) return;
-    if (usingFile) { if (audioEl && audioEl.paused) startFile(); else if (!audioEl) startFile(); }
+    if (usingFile) { if (!audioEl || audioEl.paused) startFile(); }
     else { makeCtx(); if (ctx) { ctx.resume(); if (ctx.state === 'running') startSynth(); } }
     hideHint();
   }
-  ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, unlock, { passive: true }); });
+  ['pointerdown', 'click', 'keydown', 'touchstart', 'touchend'].forEach(function (ev) {
+    document.addEventListener(ev, unlock, { passive: true });
+  });
 
   document.addEventListener('visibilitychange', function () {
     if (!wantPlay() || usingFile) return;
@@ -389,29 +384,7 @@
     else if (ctx) { ctx.resume().then(function () { if (wantPlay()) startSynth(); }); }
   });
 
-  /* ================= welcome overlay (first visit in this tab) ================= */
-  function welcome() {
-    var w = document.createElement('div');
-    w.className = 'dz-welcome'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-label', 'Happy Dashain');
-    w.innerHTML = '<div><div class="dz-big">' + eyesSVG('w') + '</div>' +
-      '<h1>शुभ बडा दशैं २०८३</h1>' +
-      '<p>Happy Dashain from all of us at Orient Consultancy. May Maa Durga bless you with success, health and happiness.</p>' +
-      '<button class="dz-btn primary" type="button" data-a="on">🎶 Enter with music</button>' +
-      '<button class="dz-btn ghost" type="button" data-a="off">Continue without music</button></div>';
-    body.appendChild(w);
-    body.style.overflow = 'hidden';
-    var first = w.querySelector('.primary'); first.focus();
-    function close(a) {
-      if (a === 'on') { sset('t0', String(Date.now())); play(true); } else { sset('music', 'off'); sset('pos', '0'); setUI(false); }
-      w.classList.add('out'); body.style.overflow = '';
-      setTimeout(function () { w.remove(); }, 700);
-    }
-    w.addEventListener('click', function (e) { var a = e.target.getAttribute && e.target.getAttribute('data-a'); if (a) close(a); });
-    w.addEventListener('keydown', function (e) { if (e.key === 'Escape') close('off'); });
-  }
-
-  /* ================= start ================= */
-  var st = sget('music');
-  if (st === null) welcome();
-  else if (st === 'on') { setUI(true); play(false); }
+  /* ================= start: theme is already visible; try to play music right away ================= */
+  if (sget('music') === null) { sset('music', 'on'); sset('t0', String(Date.now())); }
+  if (sget('music') === 'on') play();
 })();
