@@ -13,7 +13,7 @@
   var ENABLED    = true;
   var START_DATE = new Date('2026-10-09T00:00:00+05:45'); // starts 9 Oct 2026 (Nepal time)
   var END_DATE   = new Date('2026-10-28T00:00:00+05:45'); // off at midnight, so 27 Oct 2026 is the last full day
-  var MUSIC_URL  = ['audio/dashain.mp3'];  // <<< CHANGE MUSIC HERE. One or more mp3 paths, e.g. ['audio/song1.mp3','audio/song2.mp3']. Use [] for the built-in tune
+  var MUSIC_URL  = ['https://archive.org/download/NepaliDashainSongs/DashainSongsCollection.mp3'];  // <<< CHANGE MUSIC HERE. Own files: ['audio/song1.mp3','audio/song2.mp3']. Use [] for the built-in tune
   var TINT_SITE  = true;     // true = recolor buttons/headings to Dashain red & gold
   var DEFAULT_VOLUME = 0.5;
 
@@ -314,7 +314,9 @@
   function startFile() {
     if (!audioEl) {
       audioEl = new Audio();
-      audioEl.preload = 'auto';
+      audioEl.preload = 'metadata';
+      // if the file cannot load (offline / link removed), fall back to the built-in tune
+      audioEl.addEventListener('error', function () { usingFile = false; audioEl = null; if (wantPlay()) play(); });
       audioEl.volume = vol();
       audioEl.loop = tracks.length === 1;
       audioEl.src = tracks[(+sget('track') || 0) % tracks.length];
